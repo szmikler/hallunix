@@ -66,7 +66,9 @@ data.csv
 notes.txt
 script.sh
 todo.md
+
 bob@threadripper-7995WX:~$ cd Projects/work && python data_analysis.py < input/data.csv > output/results.txt
+
 bob@threadripper-7995WX:~/Projects/work$ cat output/results.txt | head
 Summary Report
 ==============
@@ -78,12 +80,16 @@ Date column: date
 Missing values: value=42, cost=17
 value mean=123.45, std=56.78, min=0.12, max=998.76
 cost mean=45.67, std=12.34, min=1.23, max=123.45
+
 bob@threadripper-7995WX:~/Projects/work$ ipython
 Python 3.10.12 (main, Jun 12 2024, 14:00:00) [GCC 11.4.0] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 IPython 8.20.0 -- An enhanced Interactive Python. Type '?' for help.
+
 In [1]: from data import data_utils
+
 In [2]: df = data_utils.load_dataset_from_hf()
+
 In [3]: df.head()
 Out[3]: 
    id        date     category region   value   cost
@@ -92,7 +98,9 @@ Out[3]:
 2   3 2023-01-03     Clothing  South    0.12  12.34
 3   4 2023-01-04  Electronics   East  250.00  56.78
 4   5 2023-01-05      Grocery  North  175.90  34.56
+
 In [4]: exit
+
 bob@threadripper-7995WX:~/Projects/work$
 
 ```
