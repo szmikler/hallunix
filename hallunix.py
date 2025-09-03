@@ -535,7 +535,7 @@ def make_argparser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    print(">>> Hint: write '::exit' to exit")
+    print(">>> Hint: type '::exit' to exit")
 
     args = make_argparser().parse_args(argv)
     completion_model = args.completion_model or args.model
