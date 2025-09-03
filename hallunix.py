@@ -27,11 +27,15 @@ import os
 import sys
 import textwrap
 from dataclasses import dataclass
+
+# Rich line editing with custom key bindings
+from prompt_toolkit import PromptSession
+from prompt_toolkit.key_binding import KeyBindings
 from typing import List, Optional, Tuple
 
 # Required deps; let ImportError surface if missing
 from litellm import completion
-import readline  # noqa: F401
+import readline  # noqa: F401  # still required for history on many systems
 
 PROMPT_DEFAULT_MODEL = os.getenv("LITELLM_MODEL", "gpt-4o-mini")
 
@@ -135,6 +139,20 @@ class Hallunix:
         self.history: List[Turn] = []
         self._header_seeded: bool = False
         self._current_prompt: str = ""
+        # prompt_toolkit session & key bindings
+        self._kb = KeyBindings()
+
+        @self._kb.add('c-j', eager=True)
+        def _(event):
+            # Insert literal newline without submitting
+            event.current_buffer.insert_text('\n')
+
+        @self._kb.add('enter', eager=True)
+        def _(event):
+            # Submit the current buffer
+            event.current_buffer.validate_and_handle()
+
+        self._session = PromptSession(key_bindings=self._kb, multiline=True)
 
     def run(self) -> None:
         header_screen, header_prompt = split_screen_and_prompt(INIT_HEADER)
@@ -144,7 +162,7 @@ class Hallunix:
 
         while True:
             try:
-                line = input(self._current_prompt)
+                line = self._session.prompt(self._current_prompt)
             except EOFError:
                 print()
                 break
