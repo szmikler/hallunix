@@ -9,6 +9,7 @@ HallUnix starts with a fresh OS session and responds to commands realistically â
 ## Features
 
 - **Mostly vibe-coded**: which means it might not work
+- **AI-powered autocompletion**: you don't even have to type â€” use TAB to see AI suggestions
 - **LLM-driven OS simulation**: every command is interpreted and answered by LLM
 - **Authentic UX**: startup neofetch logo with system details
 - **Interactive interpreters**: work in Python (`python`) or similar REPLs naturally
