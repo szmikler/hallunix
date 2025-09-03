@@ -23,23 +23,20 @@ Requirements:
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import readline  # noqa: F401  # still required for history on many systems
 import sys
 import textwrap
 from dataclasses import dataclass
-
-# Rich line editing with custom key bindings
-from prompt_toolkit import PromptSession
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.completion import Completer, Completion
 from typing import List, Optional, Tuple
-
-import json
-from prompt_toolkit.completion import Completer, Completion
 
 # Required deps; let ImportError surface if missing
 from litellm import completion
-import readline  # noqa: F401  # still required for history on many systems
+# Rich line editing with custom key bindings
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.key_binding import KeyBindings
 
 NEOFETCH_TEMPLATE = r"""
        _          _           
@@ -319,7 +316,12 @@ class Hallunix:
 
         messages = [
             {"role": "system", "content": NEOFETCH_GEN_SYSTEM_PROMPT},
-            {"role": "user", "content": NEOFETCH_GEN_USER_PROMPT.format(prompt_command=self.prompt_command, template=NEOFETCH_TEMPLATE)},
+            {
+                "role": "user",
+                "content": NEOFETCH_GEN_USER_PROMPT.format(
+                    prompt_command=self.prompt_command, template=NEOFETCH_TEMPLATE
+                ),
+            },
         ]
         kwargs = {"model": self.completion_model, "messages": messages}
         if self.temperature is not None:
@@ -335,7 +337,9 @@ class Hallunix:
         header = self._generate_neofetch_header() + "\n"
         print(header)
 
-        self._initial_header = "\n".join([NEOFETCH_TEMPLATE, header, self.prompt_command])
+        self._initial_header = "\n".join(
+            [NEOFETCH_TEMPLATE, header, self.prompt_command]
+        )
         self._current_prompt = self._normalize_prompt_for_input(self.prompt_command)
 
         while True:
