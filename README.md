@@ -1,6 +1,6 @@
 # HallUnix
 
-**HallUnix** is a fully hallucinated Unix-like environment.
+HallUnix is a fully hallucinated Unix-like environment.
 
 It mimics a Linux shell/OS by routing all commands through an LLM via [LiteLLM](https://github.com/BerriAI/litellm).  
 
