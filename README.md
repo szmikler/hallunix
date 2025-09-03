@@ -34,7 +34,7 @@ See if you are too lazy (or poor) to try it out yourself:
 
 ```
 $ python hallunix.py --model openai/gpt-5 --completion-model gpt-4o-mini --prompt-command "bob@threadripper-7995WX:~$ "
->>> Hint: write '::exit' to exit
+>>> Hint: type '::exit' to exit
 
        _          _           
       | |        (_)          
