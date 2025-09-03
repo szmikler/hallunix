@@ -18,7 +18,7 @@ HallUnix starts with a fresh OS session and responds to commands realistically â
 
 ## How to use
 
-Use with your own API keys and your favourite LLM.
+Use with your own API keys and your favourite LLM:
 
 ```
 export OPENAI_API_KEY="sk-..."
