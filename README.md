@@ -30,7 +30,7 @@ python hallunix.py --model openai/gpt-5
 
 **Example**
 
-See if you are too lazy to try it out yourself:
+See if you are too lazy (or poor) to try it out yourself:
 
 ```
 $ python hallunix.py --model openai/gpt-5 --completion-model gpt-4o-mini --prompt-command "bob@threadripper-7995WX:~$ "
