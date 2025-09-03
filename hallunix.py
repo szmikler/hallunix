@@ -445,26 +445,92 @@ def _positive_int(val: str) -> int:
 
 
 def make_argparser() -> argparse.ArgumentParser:
+    class SmartFormatter(argparse.RawDescriptionHelpFormatter):
+        """"""
+
     p = argparse.ArgumentParser(
         prog="hallunix",
-        description="AI-simulated Unix-like environment over LiteLLM",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Hallunix — an AI-simulated Unix-like environment over LiteLLM.\n"
+            "Commands you type are sent to an LLM; only the terminal output is printed."
+        ),
+        formatter_class=SmartFormatter,
         epilog=textwrap.dedent(
             """
+            Notes:
+              • The header ends with the active prompt; type immediately.
+              • Use ::exit to quit; ::history to print past commands.
+              • Enter submits; Ctrl-J inserts a literal newline.
+
             Examples:
               hallunix --model gpt-4o-mini
               hallunix --model openrouter/anthropic/claude-3.5-sonnet
-              hallunix --context-turns 50
+              hallunix --model gpt-4o-mini --completion-model gpt-4o-realtime-preview
+              hallunix --context-turns 50 --max-output-chars 5000
             """
         ),
     )
-    p.add_argument("--model", required=True)
-    p.add_argument("--completion-model", default=None)
-    p.add_argument("--context-turns", type=_positive_int, default=20)
-    p.add_argument("--temperature", type=float, default=None)
-    p.add_argument("--max-output-chars", type=_positive_int, default=20000)
-    p.add_argument("--skip-neofetch", action=argparse.BooleanOptionalAction)
-    p.add_argument("--prompt-command", type=str, default=DEFAULT_PROMPT_COMMAND)
+
+    p.add_argument(
+        "--model",
+        required=True,
+        help=(
+            "Chat model identifier passed to LiteLLM for executing commands "
+            "(e.g., 'gpt-4o-mini', 'openrouter/anthropic/claude-3.5-sonnet')."
+        ),
+    )
+    p.add_argument(
+        "--completion-model",
+        default=None,
+        help=(
+            "Model used for interactive shell autocompletion. "
+            "If not set, falls back to --model."
+        ),
+    )
+    p.add_argument(
+        "--context-turns",
+        type=_positive_int,
+        default=20,
+        help=(
+            "Number of most-recent turns to include as conversational context. "
+            "Set to 0 to disable history."
+        ),
+    )
+    p.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help=(
+            "Sampling temperature for both command execution and completion. "
+            "Omit to use the provider default."
+        ),
+    )
+    p.add_argument(
+        "--max-output-chars",
+        type=_positive_int,
+        default=20000,
+        help=(
+            "Hard cap on characters printed from the model. When exceeded, "
+            "remaining output is truncated with a notice."
+        ),
+    )
+    p.add_argument(
+        "--skip-neofetch",
+        action=argparse.BooleanOptionalAction,
+        help=(
+            "Skip generating the LLM neofetch header; print a fixed fallback banner instead."
+        ),
+    )
+    p.add_argument(
+        "--prompt-command",
+        type=str,
+        default=DEFAULT_PROMPT_COMMAND,
+        metavar="STRING",
+        help=(
+            "Exact prompt string shown before input and sent to the model when it "
+            "emits a prompt. A single trailing space is added during input."
+        ),
+    )
     return p
 
 
