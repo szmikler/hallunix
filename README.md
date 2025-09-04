@@ -70,11 +70,6 @@ See examples below if you are too lazy (or poor) to try it out yourself.
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/1477133c-94a6-435d-96e3-fcc718f1c30a" />
 
 ```
->>> type ::exit to exit
->>> type ::history to display command history
->>> press <ctrl+j> to insert a newline
->>> press <tab> to trigger auto-completion
-
        _          _           
       | |        (_)          
       | |__  _ __ _ _   _ _ __ 
