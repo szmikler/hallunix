@@ -2,9 +2,10 @@
 
 HallUnix is a fully hallucinated Unix-like OS environment.
 
-It mimics a Linux shell/OS by routing all commands through an LLM via [LiteLLM](https://github.com/BerriAI/litellm).  
+It mimics a Linux shell/OS by routing all commands through an LLM via [LiteLLM](https://github.com/BerriAI/litellm).
 
-HallUnix starts with a fresh OS session and responds to commands realistically — including interactive interpreters like Python. Session history is ephemeral (per run) and no real commands are executed on your machine.
+HallUnix starts with a fresh OS session and responds to commands realistically — including interactive interpreters like
+Python. Session history is ephemeral (per run) and no real commands are executed on your machine.
 
 ## Features
 
@@ -23,14 +24,47 @@ Use with your own API keys and your favourite LLM:
 
 ```
 export OPENAI_API_KEY="sk-..."
-python hallunix.py --model openai/gpt-5
+python hallunix.py
 ```
 
----
+### Optional arguments:
 
-**Example**
+#### `--config`
 
-See if you are too lazy (or poor) to try it out yourself:
+Path to `.json` configuration file.
+If your `.json` file contains all necessary fields, the installation prompt will be skipped.
+Example of the content:
+
+```json
+{
+  "environment-model": "gemini/gemini-2.5-pro",
+  "environment-model-config": {
+    "max_tokens": 4096
+  },
+  "assistant-model": "gemini/gemini-2.5-flash",
+  "assistant-model-config": {
+    "max_tokens": 4096
+  },
+  "os-ps1": "bob@ubuntu:~$",
+  "os-details": {
+    "OS": "Ubuntu x86_64",
+    "CPU": "AMD Ryzen Threadripper 7980X 64-Cores",
+    "GPU": "NVIDIA GeForce RTX 4090 [Discrete]"
+  }
+}
+```
+
+#### `--quick`
+
+Skip generation of logo and OS details and use the default ones.
+
+#### `--no-hints`
+
+Skip printing hints at the start of the session.
+
+## Examples
+
+See examples below if you are too lazy (or poor) to try it out yourself.
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/1477133c-94a6-435d-96e3-fcc718f1c30a" />
 
