@@ -24,69 +24,188 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import readline  # noqa: F401  # still required for history on many systems
 import sys
 import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-# Required deps; let ImportError surface if missing
 from litellm import completion
-# Rich line editing with custom key bindings
-from prompt_toolkit import PromptSession
+from prompt_toolkit import PromptSession, application, key_binding, layout, widgets
 from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.key_binding import KeyBindings
-
-NEOFETCH_TEMPLATE = r"""
-       _          _           
-      | |        (_)          
-      | |__  _ __ _ _   _ _ __ 
-      | '_ \| '__| | | | | '_ \ 
-      | | | | |  | | |_| | | | |
-      |_| |_|_|  |_|\__,_|_| |_|
-
-OS: HallUnix x86_64"""
 
 
-NEOFETCH_IF_SKIPPED = """
-Host: HallServer  
-Kernel: 5.15.0-58-generic  
-Uptime: 2 days, 4 hours, 17 minutes  
-Shell: zsh 5.8  
-CPU: Intel Core i7-9700 @ 3.00GHz  
-GPU: NVIDIA GeForce RTX 3060  
-Memory: 16GB RAM  
-Disk: 512GB SSD  
+def multiline_to_dict(config: str) -> dict[str, str]:
+    cfg = {}
+    lines = config.strip().split("\n")
+    for line in lines:
+        assert ":" in line, f"invalid configuration line: {line!r}"
+
+        k, v = line.split(":", 1)
+        try:
+            cfg[k.strip()] = json.loads(v.strip())
+        except json.JSONDecodeError:
+            cfg[k.strip()] = v.strip()
+    return cfg
+
+
+def dict_to_multiline(cfg: dict[str, str] | None) -> str | None:
+    if cfg is None:
+        return None
+    lines = [f"{k}: {v}" for k, v in cfg.items()]
+    return "\n".join(lines)
+
+
+class HallunixConfig:
+    quick: bool = False
+
+    env_model: str | None = None
+    env_model_config: dict | None = None
+
+    ast_model: str | None = None
+    ast_model_config: dict | None = None
+
+    os_ps1: str | None = None
+    os_details: dict | None = None
+
+    def from_dict(self, config: dict):
+        self.env_model = config.get("environment-model", self.env_model)
+        self.env_model_config = config.get(
+            "environment-model-config", self.env_model_config
+        )
+        self.ast_model = config.get("assistant-model", self.ast_model)
+        self.ast_model_config = config.get(
+            "assistant-model-config", self.ast_model_config
+        )
+        self.os_ps1 = config.get("os-ps1", self.os_ps1)
+        self.os_details = config.get("os-details", self.os_details)
+
+        if isinstance(self.env_model_config, str):
+            self.env_model_config = multiline_to_dict(self.env_model_config)
+        if isinstance(self.ast_model_config, str):
+            self.ast_model_config = multiline_to_dict(self.ast_model_config)
+        if isinstance(self.os_details, str):
+            self.os_details = multiline_to_dict(self.os_details)
+
+    def all_set(self):
+        return (
+            isinstance(self.env_model, str)
+            and isinstance(self.ast_model, str)
+            and isinstance(self.env_model_config, dict)
+            and isinstance(self.ast_model_config, dict)
+            and isinstance(self.os_ps1, str)
+            and isinstance(self.os_details, dict)
+        )
+
+    def __repr__(self):
+        return (
+            "HallunixConfig("
+            f"env_model={self.env_model!r}, "
+            f"env_model_kwds={self.env_model_config!r}, "
+            f"ast_model={self.ast_model!r}, "
+            f"ast_model_kwds={self.ast_model_config!r}, "
+            f"os_ps1={self.os_ps1!r}, "
+            f"os_details={self.os_details!r}"
+            ")"
+        )
+
+
+CONFIG = HallunixConfig()
+
+
+QUICK_INIT = r"""
+  _   _       _ _   _       
+ | | | | __ _| | |_(_)_ __  
+ | |_| |/ _` | | __| | '_ \ 
+ |  _  | (_| | | |_| | | | |
+ |_| |_|\__,_|_|\__|_|_| |_|
+   _   _       _           
+  | | | |_ __ | | ___  ___ 
+  | | | | '_ \| |/ _ \/ __|
+  | |_| | | | | |  __/\__ \
+   \___/|_| |_|_|\___||___/
+
+OS: HallUnix x86_64
+Host: HallMachine
+Kernel: 5.18.3-hallunix
+Uptime: 3 days, 4 hours, 12 mins
+Packages: 1578
+Shell: bash 5.2.15
 Resolution: 1920x1080
+DE: GlowWM 1.4
+WM: GlowWM
+CPU: AMD Ryzen 7 5800X (8) @ 3.8GHz
+GPU: Radeon RX 6800
+Memory: 12437MiB / 32768MiB
+
+user@hallunix:~$
 """
 
 
-NEOFETCH_GEN_SYSTEM_PROMPT = """
-You generate a neofetch-style banner for a simulated Unix shell.
+NEOFETCH_ART_SYSTEM_PROMPT = r"""
+You are an Neofetch ASCII art generator for a simulated Unix shell. 
+Output requirements:
+- Output ONLY ASCII art in plain text (no Markdown, no code fences, no explanations).
+- The art must depict something thematically related to Unix, Linux, or computing.
+- The art must be at most 10 lines tall.
+- The art must be at most 50 characters wide.
+- The art must be properly aligned, consistent, and visually appealing.
+- Use only standard ASCII characters (no Unicode, no extended symbols).
+- Do not include labels, comments, or extra text.
+- Always return a complete ASCII art block, never partial or broken art.
+- If you see a real OS, use its real Neofetch ASCII art.
+- If you see a non-real OS, create a plausible Neofetch ASCII art for it.
+
+Examples of valid ASCII art:
+   _          _           
+  | |        (_)          
+  | |__  _ __ _ _   _ _ __ 
+  | '_ \| '__| | | | | '_ \ 
+  | | | | |  | | |_| | | | |
+  |_| |_|_|  |_|\__,_|_| |_|
+   ____        _       
+  |  _ \ _   _| | ___  
+  | |_) | | | | |/ _ \ 
+  |  __/| |_| | |  __/ 
+  |_|    \__,_|_|\___|  
+   .--.     
+  |o_o |    
+  |:_/ |    
+ //   \ \   
+(|     | )  
+/'\_   _/`\ 
+\___)=(___/ 
+"""
+
+NEOFETCH_ART_USER_PROMPT = """
+Provided initial data:
+{initial_data_str}
+
+Generate an ASCII logo or symbol inspired by the data (if relevant). Ignore non-relevant data.
+"""
+
+NEOFETCH_DATA_SYSTEM_PROMPT = """
+You generate a neofetch-style system info for a simulated Unix shell.
 Return ONLY plain text (no Markdown, no code fences).
 Requirements:
-- DO NOT REPEAT the supplied ASCII art block or the initial fields
-- Provide realistic neofetch fields: Host, Kernel, Uptime, Shell, CPU, GPU, Memory, etc.
-- Keep tidy alignment; don't wrap excessively.
-- Do NOT include any explanations or annotations.
-- Do NOT align the fields, simply use 'Name: Value' with a single space.
+- You must include ALL the provided initial data
+- Make sure you provide realistic neofetch fields like: Host, Kernel, Uptime, Shell, CPU, GPU, Memory, etc.
+- Provide fields in the correct order, like they would appear in a real terminal
+- Every field must be placed in a separate line
+- Do NOT include any explanations or annotations
+- Do NOT align the fields with multiple spaces. Instead use 'Name: Value' with a single space
+- Do NOT include anything except for the fields, for example do not include line with 'username@hostname'
 """
 
-NEOFETCH_GEN_USER_PROMPT = """
-User prompt:
-{prompt_command}
+NEOFETCH_DATA_USER_PROMPT = """
+Provided initial data:
+{initial_data_str}
 
-Base ASCII art and initial fields:
-{template}
+Complete missing fields following the rules.
+"""
 
-Complete it now following the rules."""
-
-
-DEFAULT_PROMPT_COMMAND = "user@hallunix:~$ "
-
-SYSTEM_PROMPT = """
-You are HallUnix, an AI-simulated Linux/Unix-like OS.
+ENVIRONMENT_SYSTEM_PROMPT = """
+You are an AI-simulated Linux/Unix-like OS.
 Act like a full OS shell: interpret each user line strictly as a command and
 output ONLY the terminal output (stdout/stderr) for that command.
 NEVER include explanations, Markdown, code fences, or surrounding quotes.
@@ -99,9 +218,10 @@ commands+outputs as truth. Do not claim '.' is missing.
 
 Header & prompts: The session begins with the neofetch-style header below,
 which already ends with a prompt and no trailing newline. Treat that exact
-text as your first assistant message and continue from there. When emitting a
-prompt (shell `$` prompt or Python `>>>`), end it with a single space and do
-not add a trailing newline. Examples: 'user@hallunix:~$ ', '>>> '.
+text as your first assistant message and continue from there. Usually after
+command output there should be a newline and a prompt. When emitting the prompt
+(shell `$` prompt or Python `>>>`), end it with a single space and do not add
+a trailing newline. Examples: 'user@hallunix:~$ ', '>>> '.
 
 Large outputs: be realistic; truncate like a pager/head with ellipses when huge.
 """
@@ -110,12 +230,14 @@ Large outputs: be realistic; truncate like a pager/head with ellipses when huge.
 
 # ---- Completion prompt templates (global) ----
 COMPLETION_SYSTEM_PROMPT = """
-You are a Bash command-completion engine for a Unix-like shell.
+You are a command completion engine for a novel OS.
 Respond with ONLY a strict JSON array of {n} strings — no explanations, no prose.
 Each string must be a valid, complete Bash command line or short multi-line snippet.
+You will be presented with the entire conversation history for context.
 
 Guidelines:
-- Completions must begin EXACTLY with the user’s input.
+- Provide many different completions to the user.
+- All completions must begin EXACTLY with the user’s input.
 - Provide completions with varying complexity.
   Start from trivial completions, but finish with complex and interesting ones.
 - Favor realistic, non-trivial commands: pipelines (grep/awk/sed/jq), redirections,
@@ -123,10 +245,10 @@ Guidelines:
   journalctl or loops/conditionals 
 - Multi-line snippets are allowed if natural (e.g., loops, here-docs).
 - Suggestions should be useful and diverse.
-
-You will be presented with whole converstaion history for context.
+- Suggestions should match the current context.
+  If the user is currently in Python interpreter, it should suggest Python commands.
+  Same goes for other interactive environments.
 """
-
 
 COMPLETION_USER_PROMPT = """
 Now it is time to generate completions!
@@ -141,19 +263,81 @@ Return EXACTLY {n} diverse, high-quality suggestions as a JSON array of strings.
 """
 
 
+def strip_code_fences(text: str) -> str:
+    """Remove common Markdown fences if a model emits them."""
+    if not text:
+        return ""
+    t = text
+    s = t.strip("\n")
+    if s.startswith("```") and s.endswith("```"):
+        lines = s.splitlines()
+        if len(lines) >= 2:
+            t = "\n".join(lines[1:-1])
+    if t.startswith("```"):
+        t = t.lstrip("`")
+    if t.endswith("```"):
+        t = t.rstrip("`")
+    return t
+
+
+def split_screen_and_prompt(s: str) -> Tuple[str, str]:
+    if not s:
+        return "", ""
+    if s.endswith("\n"):
+        return s, ""
+    nl = s.rfind("\n")
+    if nl == -1:
+        return "", s
+    return s[: nl + 1], s[nl + 1 :]
+
+
+def generate_neofetch_data() -> str:
+    """
+    Ask the LLM to complete the NEOFETCH base and return a header that ends with a prompt.
+    """
+    initial_data_str = dict_to_multiline(CONFIG.os_details)
+    user_prompt_str = NEOFETCH_DATA_USER_PROMPT.format(
+        initial_data_str=initial_data_str
+    )
+
+    messages = [
+        {"role": "system", "content": NEOFETCH_DATA_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt_str},
+    ]
+    resp = completion(
+        model=CONFIG.ast_model, messages=messages, **CONFIG.ast_model_config
+    )
+    raw = resp["choices"][0]["message"]["content"] or ""
+    return strip_code_fences(raw.strip()) + "\n"
+
+
+def generate_neofetch_art() -> str:
+    """
+    Ask the LLM to generate a simple ASCII art for the neofetch header.
+    """
+    initial_data_str = dict_to_multiline(CONFIG.os_details)
+    user_prompt_str = NEOFETCH_ART_USER_PROMPT.format(initial_data_str=initial_data_str)
+
+    messages = [
+        {"role": "system", "content": NEOFETCH_ART_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt_str},
+    ]
+    resp = completion(
+        model=CONFIG.ast_model, messages=messages, **CONFIG.ast_model_config
+    )
+    raw = resp["choices"][0]["message"]["content"] or ""
+    return strip_code_fences(raw.rstrip()) + "\n"
+
+
 class HallunixCompleter(Completer):
     def __init__(
         self,
         *,
-        model: str,
-        temperature: Optional[float],
+        hallunix: "HallunixSession",
         max_suggestions: int,
-        hallunix: "Hallunix",
     ) -> None:
-        self.model = model
-        self.temperature = temperature
-        self.max_suggestions = max(1, int(max_suggestions))
         self.hallunix = hallunix
+        self.max_suggestions = max(1, int(max_suggestions))
 
     def _query_llm(self, line_prefix: str) -> list[str]:
         user_prompt = COMPLETION_USER_PROMPT.format(
@@ -162,18 +346,14 @@ class HallunixCompleter(Completer):
         )
         sys_prompt = COMPLETION_SYSTEM_PROMPT.format(n=self.max_suggestions)
         messages = self.hallunix.compose_messages_with_context(
-            user_prompt = user_prompt,
-            system_prompt = sys_prompt,
+            user_prompt=user_prompt,
+            system_prompt=sys_prompt,
         )
 
         resp = completion(
-            model=self.model,
+            model=CONFIG.ast_model,
             messages=messages,
-            **(
-                {"temperature": self.temperature}
-                if self.temperature is not None
-                else {}
-            ),
+            **CONFIG.ast_model_config,
         )
         raw = (resp["choices"][0]["message"]["content"] or "").strip()
         cleaned = strip_code_fences(raw).strip()
@@ -207,123 +387,52 @@ class HallunixCompleter(Completer):
             )
 
 
-def strip_code_fences(text: str) -> str:
-    """Remove common Markdown fences if a model emits them."""
-    if not text:
-        return ""
-    t = text
-    s = t.strip("\n")
-    if s.startswith("```") and s.endswith("```"):
-        lines = s.splitlines()
-        if len(lines) >= 2:
-            t = "\n".join(lines[1:-1])
-    if t.startswith("```"):
-        t = t.lstrip("`")
-    if t.endswith("```"):
-        t = t.rstrip("`")
-    return t
-
-
-def split_screen_and_prompt(s: str) -> Tuple[str, str]:
-    if not s:
-        return "", ""
-    if s.endswith("\n"):
-        return s, ""
-    nl = s.rfind("\n")
-    if nl == -1:
-        return "", s
-    return s[: nl + 1], s[nl + 1 :]
-
-
 @dataclass
 class Turn:
     command: str
     output: str
 
 
-class Hallunix:
+class HallunixSession:
     def __init__(
         self,
-        model: str,
-        completion_model: str,
-        context_turns: int,
-        system_prompt: str,
-        temperature: Optional[float],
-        max_output_chars: int,
-        skip_neofetch: bool,
-        prompt_command: str,
+        max_context_turns: int,
     ) -> None:
-        self.model = model
-        self.completion_model = completion_model
 
-        self.skip_neofetch = skip_neofetch
-        self.prompt_command = prompt_command
-
-        self.context_turns = max(0, context_turns)
-        self.system_prompt = system_prompt
-        self.temperature = temperature
-        self.max_output_chars = max_output_chars
+        self.max_context_turns = max(0, max_context_turns)
         self.history: List[Turn] = []
         self._current_prompt: str = ""
-        self._initial_header: str | None = None
-        # prompt_toolkit session & key bindings
-        self._kb = KeyBindings()
+        self._session_header: str | None = None
+        self._kb = key_binding.KeyBindings()
 
         @self._kb.add("c-j", eager=True)
-        def _(event):
-            # Insert literal newline without submitting
+        def _(event):  # Insert literal newline without submitting
             event.current_buffer.insert_text("\n")
 
         @self._kb.add("enter", eager=True)
-        def _(event):
-            # Submit the current buffer
+        def _(event):  # Submit the current buffer
             event.current_buffer.validate_and_handle()
 
         self._session = PromptSession(key_bindings=self._kb, multiline=True)
-
-        self._completer = HallunixCompleter(
-            model=self.completion_model,
-            temperature=self.temperature,
-            max_suggestions=6,
-            hallunix=self,
-        )
-
-    def _generate_neofetch_header(self) -> str:
-        """
-        Ask the LLM to complete the NEOFETCH base and return a header that
-        ends with 'user@hallunix:~$ ' and NO trailing newline.
-        Defensive fixes are applied if the model misses a constraint.
-        """
-        if self.skip_neofetch:
-            return NEOFETCH_IF_SKIPPED.strip()
-
-        messages = [
-            {"role": "system", "content": NEOFETCH_GEN_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": NEOFETCH_GEN_USER_PROMPT.format(
-                    prompt_command=self.prompt_command, template=NEOFETCH_TEMPLATE
-                ),
-            },
-        ]
-        kwargs = {"model": self.completion_model, "messages": messages}
-        if self.temperature is not None:
-            kwargs["temperature"] = self.temperature
-
-        resp = completion(**kwargs)
-        raw = resp["choices"][0]["message"]["content"] or ""
-        txt = strip_code_fences(raw)
-        return txt.strip()
+        self._completer = HallunixCompleter(hallunix=self, max_suggestions=6)
 
     def run(self) -> None:
-        print(NEOFETCH_TEMPLATE)
-        header = self._generate_neofetch_header() + "\n"
-        print(header)
+        if CONFIG.quick:
+            screen, prompt = split_screen_and_prompt(QUICK_INIT.strip("\n"))
+            self._current_prompt = self._normalize_prompt_for_input(prompt)
+            self._session_header = QUICK_INIT
+            print(screen, end="")
+        else:
+            neofetch_art = generate_neofetch_art()
+            print(neofetch_art)
 
-        self._initial_header = "\n".join(
-            [NEOFETCH_TEMPLATE, header, self.prompt_command]
-        )
-        self._current_prompt = self._normalize_prompt_for_input(self.prompt_command)
+            neofetch_data = generate_neofetch_data()
+            print(neofetch_data)
+
+            self._current_prompt = self._normalize_prompt_for_input(CONFIG.os_ps1)
+            self._session_header = "\n".join(
+                (neofetch_art, neofetch_data, self._current_prompt)
+            )
 
         while True:
             try:
@@ -340,22 +449,13 @@ class Hallunix:
                 print()
                 continue
 
-            if not line.strip():
-                out, _ = self._exec_with_llm("")
-                screen, prompt = split_screen_and_prompt(out)
-                if screen:
-                    print(screen, end="")
-                if prompt:
-                    self._current_prompt = self._normalize_prompt_for_input(prompt)
-                continue
-
-            if line.strip() in {"::exit"}:
+            if line.strip() == "::exit":
                 break
             if line.strip() == "::history":
                 self._print_history()
                 continue
 
-            output, _ = self._exec_with_llm(line)
+            output = self._environment_action(line)
             if output is not None:
                 screen, prompt = split_screen_and_prompt(output)
                 if screen:
@@ -364,181 +464,172 @@ class Hallunix:
                     self._current_prompt = self._normalize_prompt_for_input(prompt)
             self.history.append(Turn(command=line, output=output or ""))
 
-    def compose_messages_with_context(self, user_prompt: str, system_prompt: str) -> list:
+    def compose_messages_with_context(
+        self, user_prompt: str, system_prompt: str
+    ) -> list:
         messages = [{"role": "system", "content": system_prompt}]
 
-        assert self._initial_header is not None
-        messages.append({"role": "assistant", "content": self._initial_header})
+        assert self._session_header is not None
+        messages.append({"role": "assistant", "content": self._session_header})
 
-        if self.history and self.context_turns:
-            recent = self.history[-self.context_turns :]
+        if self.history and self.max_context_turns:
+            recent = self.history[-self.max_context_turns :]
             for t in recent:
                 messages.append({"role": "user", "content": t.command})
                 messages.append({"role": "assistant", "content": t.output or ""})
         messages.append({"role": "user", "content": user_prompt})
         return messages
 
-    def _exec_with_llm(self, command: str) -> Tuple[str, bool]:
-        messages = self.compose_messages_with_context(command, self.system_prompt)
+    def _environment_action(self, command: str) -> str | None:
+        messages = self.compose_messages_with_context(
+            command or " ", ENVIRONMENT_SYSTEM_PROMPT
+        )
+        assert len(messages) > 0 and messages[-1]["role"] != "assistant"
+
         try:
-            kwargs = {"model": self.model, "messages": messages}
-            if self.temperature is not None:
-                kwargs["temperature"] = self.temperature
-
-            resp = completion(**kwargs)
+            resp = completion(
+                model=CONFIG.env_model, messages=messages, **CONFIG.env_model_config
+            )
             content = resp["choices"][0]["message"]["content"] or ""
-
-            # Apply local truncation if necessary
-            if len(content) >= self.max_output_chars:
-                content = (
-                    content[: self.max_output_chars]
-                    + "\n[hallunix: output truncated]\n"
-                )
-
             cleaned = strip_code_fences(content)
-            return cleaned, False
-        except KeyboardInterrupt:
-            return "^C", False
-        except Exception as e:
-            return f"hallunix: error contacting LLM: {type(e).__name__}: {e}", False
+            return cleaned
+
+        except (KeyboardInterrupt, IndexError, KeyError):
+            print()
+            return None
 
     def _normalize_prompt_for_input(self, prompt: str) -> str:
-        if not prompt:
-            return ""
-        return prompt.rstrip() + " "
+        return prompt.rstrip() + " " if prompt else ""
 
     def _print_history(self) -> None:
+        header = "idx\tinput\toutput characters"
+        print(header)
+        print("---")
+
         if not self.history:
             print("(no history)")
-            return
-        width = len(str(len(self.history)))
         for i, t in enumerate(self.history, start=1):
-            num = str(i).rjust(width)
-            print(f"{num}  {t.command}")
+            print(f"{i}\t{t.command}\t{len(t.output)}")
 
 
-def _positive_int(val: str) -> int:
-    try:
-        iv = int(val)
-        if iv < 0:
-            raise ValueError
-        return iv
-    except Exception:
-        raise argparse.ArgumentTypeError("must be non-negative integer")
+def get_installation_app():
+    text_areas = {}
 
+    def labeled_text_area(display, label, **kwds):
+        text_areas[label] = widgets.TextArea(**kwds, focus_on_click=True)
+        return layout.HSplit([widgets.Label(text=display), text_areas[label]])
 
-def make_argparser() -> argparse.ArgumentParser:
-    class SmartFormatter(argparse.RawDescriptionHelpFormatter):
-        """"""
-
-    p = argparse.ArgumentParser(
-        prog="hallunix",
-        description=(
-            "Hallunix — an AI-simulated Unix-like environment over LiteLLM.\n"
-            "Commands you type are sent to an LLM; only the terminal output is printed."
+    fields = [
+        labeled_text_area(
+            label="environment-model",
+            display="Environment Model",
+            text=CONFIG.env_model or "openai/gpt-5",
+            height=2,
         ),
-        formatter_class=SmartFormatter,
-        epilog=textwrap.dedent(
-            """
-            Notes:
-              • The header ends with the active prompt; type immediately.
-              • Use ::exit to quit; ::history to print past commands.
-              • Enter submits; Ctrl-J inserts a literal newline.
+        labeled_text_area(
+            label="environment-model-config",
+            display="Environment Model Configuration",
+            text=dict_to_multiline(CONFIG.env_model_config) or "max_tokens: 4096",
+            height=6,
+        ),
+        labeled_text_area(
+            label="assistant-model",
+            display="Assistant Model",
+            text=CONFIG.ast_model or "openai/gpt-4.1-mini",
+            height=2,
+        ),
+        labeled_text_area(
+            label="assistant-model-config",
+            display="Assistant Model Configuration",
+            text=dict_to_multiline(CONFIG.ast_model_config) or "max_tokens: 4096",
+            height=6,
+        ),
+        labeled_text_area(
+            label="os-ps1",
+            display="OS PS1 Prompt",
+            text=CONFIG.os_ps1 or "user@hallunix:~$",
+            height=2,
+        ),
+        labeled_text_area(
+            label="os-details",
+            display="OS Details",
+            text=dict_to_multiline(CONFIG.os_details) or "OS: HallUnix x86_64",
+            height=6,
+        ),
+    ]
 
-            Examples:
-              hallunix --model gpt-4o-mini
-              hallunix --model openrouter/anthropic/claude-3.5-sonnet
-              hallunix --model gpt-4o-mini --completion-model gpt-4o-realtime-preview
-              hallunix --context-turns 50 --max-output-chars 5000
-            """
-        ),
-    )
-
-    p.add_argument(
-        "--model",
-        required=True,
-        help=(
-            "Chat model identifier passed to LiteLLM for executing commands "
-            "(e.g., 'gpt-4o-mini', 'openrouter/anthropic/claude-3.5-sonnet')."
-        ),
-    )
-    p.add_argument(
-        "--completion-model",
-        default=None,
-        help=(
-            "Model used for interactive shell autocompletion. "
-            "If not set, falls back to --model."
-        ),
-    )
-    p.add_argument(
-        "--context-turns",
-        type=_positive_int,
-        default=20,
-        help=(
-            "Number of most-recent turns to include as conversational context. "
-            "Set to 0 to disable history."
+    dialog = widgets.Dialog(
+        title="HallUnix Installation",
+        body=layout.HSplit(
+            [
+                widgets.Button(
+                    text="Continue", handler=lambda: app.exit(result=get_result())
+                ),
+                *fields,
+            ],
+            padding=1,
+            width=60,
         ),
     )
-    p.add_argument(
-        "--temperature",
-        type=float,
-        default=None,
-        help=(
-            "Sampling temperature for both command execution and completion. "
-            "Omit to use the provider default."
-        ),
+
+    def get_result():
+        return {label: text_area.text for label, text_area in text_areas.items()}
+
+    root = layout.FloatContainer(
+        content=layout.Window(),
+        floats=[layout.Float(content=dialog)],
     )
-    p.add_argument(
-        "--max-output-chars",
-        type=_positive_int,
-        default=20000,
-        help=(
-            "Hard cap on characters printed from the model. When exceeded, "
-            "remaining output is truncated with a notice."
-        ),
+
+    keys = key_binding.KeyBindings()
+
+    @keys.add("c-c")
+    @keys.add("c-q")
+    def _(event):
+        sys.exit(1)
+
+    app = application.Application(
+        layout=layout.Layout(root),
+        mouse_support=True,
+        full_screen=True,
+        key_bindings=keys,
     )
-    p.add_argument(
-        "--skip-neofetch",
-        action=argparse.BooleanOptionalAction,
-        help=(
-            "Skip generating the LLM neofetch header; print a fixed fallback banner instead."
-        ),
-    )
-    p.add_argument(
-        "--prompt-command",
-        type=str,
-        default=DEFAULT_PROMPT_COMMAND,
-        metavar="STRING",
-        help=(
-            "Exact prompt string shown before input and sent to the model when it "
-            "emits a prompt. A single trailing space is added during input."
-        ),
-    )
-    return p
+    return app
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    print(">>> Hint: type '::exit' to exit")
+HINTS_STR = """
+type ::exit to exit
+type ::history to display command history
+press <ctrl+j> to insert a newline
+press <tab> to trigger auto-completion
+"""
 
-    args = make_argparser().parse_args(argv)
-    completion_model = args.completion_model or args.model
 
-    shell = Hallunix(
-        model=args.model,
-        completion_model=completion_model,
-        context_turns=args.context_turns,
-        system_prompt=SYSTEM_PROMPT,
-        temperature=args.temperature,
-        max_output_chars=args.max_output_chars,
-        skip_neofetch=args.skip_neofetch,
-        prompt_command=args.prompt_command,
-    )
-    try:
-        shell.run()
-        return 0
-    except Exception as e:
-        print(f"hallunix: fatal error: {e}", file=sys.stderr)
-        return 1
+def main(argv: Optional[List[str]] = None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=False)
+    parser.add_argument("--quick", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--hints", action=argparse.BooleanOptionalAction, default=True)
+    args = parser.parse_args(argv)
+
+    CONFIG.quick = args.quick
+
+    if args.hints:
+        tutorial = textwrap.indent(HINTS_STR, prefix=">>> ").strip()
+        print(tutorial)
+        print()
+
+    if args.config is not None:
+        with open(args.config, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        CONFIG.from_dict(config)
+    if not CONFIG.all_set():
+        app = get_installation_app()
+        config = app.run()
+        CONFIG.from_dict(config)
+    assert CONFIG.all_set(), str(CONFIG)
+
+    shell = HallunixSession(max_context_turns=100)
+    shell.run()
 
 
 if __name__ == "__main__":
