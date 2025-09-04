@@ -32,7 +32,7 @@ python hallunix.py --model openai/gpt-5
 
 See if you are too lazy (or poor) to try it out yourself:
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/4bb653f2-024c-42b8-8b34-1529aeba1007" />
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/1477133c-94a6-435d-96e3-fcc718f1c30a" />
 
 ```
 >>> type ::exit to exit
