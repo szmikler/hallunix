@@ -607,12 +607,44 @@ press <tab> to trigger auto-completion
 
 
 def main(argv: Optional[List[str]] = None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=False)
-    parser.add_argument("--quick", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--hints", action=argparse.BooleanOptionalAction, default=True)
-    args = parser.parse_args(argv)
+    parser = argparse.ArgumentParser(
+        prog="hallunix",
+        description=(
+            "Hallunix — hallucinated Unix-like environment.\n"
+            "An AI-simulated shell that interprets commands through an LLM, "
+            "rendering realistic terminal output with a neofetch-style header."
+        ),
+    )
 
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=False,
+        metavar="FILE",
+        help=(
+            "Path to JSON configuration file specifying models, prompts, "
+            "and OS details. If omitted, an interactive installer is launched."
+        ),
+    )
+
+    parser.add_argument(
+        "--quick",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Use a built-in static neofetch header instead of generating one via models. "
+            "Still requires environment/assistant models to run. Default: off."
+        ),
+    )
+
+    parser.add_argument(
+        "--hints",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show usage hints on startup (controls, ::exit, ::history). Default: on.",
+    )
+
+    args = parser.parse_args(argv)
     CONFIG.quick = args.quick
 
     if args.hints:
