@@ -24,6 +24,7 @@ Use with your own API keys and your favourite LLM:
 
 ```
 export OPENAI_API_KEY="sk-..."
+pip install -r requirements.txt
 python hallunix.py
 ```
 
