@@ -504,14 +504,11 @@ class HallunixSession:
         return prompt.rstrip() + " " if prompt else ""
 
     def _print_history(self) -> None:
-        header = "idx\tinput\toutput characters"
+        header = "idx\toutput\tinput"
         print(header)
         print("---")
-
-        if not self.history:
-            print("(no history)")
         for i, t in enumerate(self.history, start=1):
-            print(f"{i}\t{t.command}\t{len(t.output)}")
+            print(f"{i}\t{len(t.output)}\t{t.command}")
 
 
 def get_installation_app():
