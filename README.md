@@ -32,9 +32,13 @@ python hallunix.py --model openai/gpt-5
 
 See if you are too lazy (or poor) to try it out yourself:
 
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/4bb653f2-024c-42b8-8b34-1529aeba1007" />
+
 ```
-$ python hallunix.py --model openai/gpt-5 --completion-model gpt-4o-mini --prompt-command "bob@threadripper-7995WX:~$ "
->>> Hint: type '::exit' to exit
+>>> type ::exit to exit
+>>> type ::history to display command history
+>>> press <ctrl+j> to insert a newline
+>>> press <tab> to trigger auto-completion
 
        _          _           
       | |        (_)          
@@ -101,6 +105,5 @@ Out[3]:
 
 In [4]: exit
 
-bob@threadripper-7995WX:~/Projects/work$
-
+bob@threadripper-7995WX:~/Projects/work$ ::exit
 ```
