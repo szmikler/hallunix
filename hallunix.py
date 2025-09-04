@@ -123,14 +123,17 @@ Guidelines:
   journalctl or loops/conditionals 
 - Multi-line snippets are allowed if natural (e.g., loops, here-docs).
 - Suggestions should be useful and diverse.
+
+You will be presented with whole converstaion history for context.
 """
 
 
-COMPLETION_USER_PROMPT = """Recent shell history (most recent last):
-{history}
+COMPLETION_USER_PROMPT = """
+Now it is time to generate completions!
+You will act as the autocompletion engine.
+Your suggestions should replace the ENTIRE current line (from beginning-of-line to cursor).
 
-Replace the ENTIRE current line (from beginning-of-line to cursor).
-Current line before cursor:
+This is current line before cursor:
 ```
 {line}
 ```
@@ -152,40 +155,20 @@ class HallunixCompleter(Completer):
         self.max_suggestions = max(1, int(max_suggestions))
         self.hallunix = hallunix
 
-        self._history_max = 20
-
-    # Build a plain :history-style text (numbers + commands only).
-    def _history_text(self) -> str:
-        hist = self.hallunix.history
-        if not hist:
-            return "(no history)"
-
-        items = hist[-self._history_max :]
-        width = len(str(len(hist)))
-        start_index = len(hist) - len(items) + 1
-        lines = []
-        for i, t in enumerate(items, start=start_index):
-            num = str(i).rjust(width)
-            cmd = (t.command or "").replace("\n", "\\n")
-            lines.append(f"{num}  {cmd}")
-        return "\n".join(lines)
-
-    def _messages(self, line_prefix: str) -> list:
-        sys_prompt = COMPLETION_SYSTEM_PROMPT.format(n=self.max_suggestions)
+    def _query_llm(self, line_prefix: str) -> list[str]:
         user_prompt = COMPLETION_USER_PROMPT.format(
-            history=self._history_text(),
             line=line_prefix,
             n=self.max_suggestions,
         )
-        return [
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        sys_prompt = COMPLETION_SYSTEM_PROMPT.format(n=self.max_suggestions)
+        messages = self.hallunix.compose_messages_with_context(
+            user_prompt = user_prompt,
+            system_prompt = sys_prompt,
+        )
 
-    def _query_llm(self, line_prefix: str) -> list[str]:
         resp = completion(
             model=self.model,
-            messages=self._messages(line_prefix),
+            messages=messages,
             **(
                 {"temperature": self.temperature}
                 if self.temperature is not None
@@ -381,8 +364,8 @@ class Hallunix:
                     self._current_prompt = self._normalize_prompt_for_input(prompt)
             self.history.append(Turn(command=line, output=output or ""))
 
-    def _build_messages(self, new_command: str) -> list:
-        messages = [{"role": "system", "content": self.system_prompt}]
+    def compose_messages_with_context(self, user_prompt: str, system_prompt: str) -> list:
+        messages = [{"role": "system", "content": system_prompt}]
 
         assert self._initial_header is not None
         messages.append({"role": "assistant", "content": self._initial_header})
@@ -392,11 +375,11 @@ class Hallunix:
             for t in recent:
                 messages.append({"role": "user", "content": t.command})
                 messages.append({"role": "assistant", "content": t.output or ""})
-        messages.append({"role": "user", "content": new_command})
+        messages.append({"role": "user", "content": user_prompt})
         return messages
 
     def _exec_with_llm(self, command: str) -> Tuple[str, bool]:
-        messages = self._build_messages(command)
+        messages = self.compose_messages_with_context(command, self.system_prompt)
         try:
             kwargs = {"model": self.model, "messages": messages}
             if self.temperature is not None:
