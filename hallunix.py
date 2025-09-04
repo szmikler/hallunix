@@ -39,9 +39,11 @@ def multiline_to_dict(config: str) -> dict[str, str]:
     cfg = {}
     lines = config.strip().split("\n")
     for line in lines:
-        assert ":" in line, f"invalid configuration line: {line!r}"
-
-        k, v = line.split(":", 1)
+        if ":" in line:
+            k, v = line.split(":", 1)
+        else:
+            k = line
+            v = " "
         try:
             cfg[k.strip()] = json.loads(v.strip())
         except json.JSONDecodeError:
