@@ -2,9 +2,8 @@
 
 HallUnix is a fully hallucinated Unix-like OS environment.
 
-It mimics a Linux shell/OS by routing all commands through an LLM via [LiteLLM](https://github.com/BerriAI/litellm).
-
-HallUnix starts with a fresh OS session and responds to commands realistically — including interactive interpreters like
+HallUnix mimics a Linux shell/OS by routing all commands through an LLM via [LiteLLM](https://github.com/BerriAI/litellm).
+It starts with a fresh OS session and responds to commands realistically — including interactive interpreters like
 Python. Session history is ephemeral (per run) and no real commands are executed on your machine.
 
 ## Features
@@ -65,8 +64,10 @@ Skip printing hints at the start of the session.
 
 See examples below if you are too lazy (or poor) to try it out yourself.
 
+### Installation
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/1477133c-94a6-435d-96e3-fcc718f1c30a" />
 
+### Session
 ```
        _          _           
       | |        (_)          
