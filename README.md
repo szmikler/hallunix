@@ -27,7 +27,7 @@ python hallunix.py
 
 ### Optional arguments:
 
-#### `--config`
+#### `--config FILE`
 
 Path to `.json` configuration file.
 If your `.json` file contains all necessary fields, the installation prompt will be skipped.
