@@ -10,12 +10,10 @@ Python. Session history is ephemeral (per run) and no real commands are executed
 ## Features
 
 - **Mostly vibe-coded**: which means it might not work
-- **AI-powered autocompletion**: you don't even have to type — use TAB to see AI suggestions
-- **LLM-driven OS simulation**: every command is interpreted and answered by LLM
-- **Authentic UX**: startup neofetch logo with system details
-- **Interactive interpreters**: work in Python (`python`) or similar REPLs naturally
-- **Ephemeral state**: no persistence across runs
-- **Command history**: typing `::history` shows all commands from the session (why? idk)
+- **LLM-powered OS**: every command is interpreted and answered by LLM
+- **AI-powered autocompletion**: you don't have to type — use TAB to see AI suggestions
+- **Authentic UX**: installation dialog and startup neofetch logo with system details
+- **Interactive interpreters**: work well in Python (`python`) or similar REPLs naturally
 - **Possible to exit**: by typing `::exit`
 
 ## How to use
