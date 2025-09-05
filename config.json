@@ -1,0 +1,14 @@
+{
+  "environment-model": "openai/gpt-5",
+  "environment-model-config": {
+    "max_tokens": 4096
+  },
+  "assistant-model": "openai/gpt-4.1-mini",
+  "assistant-model-config": {
+    "max_tokens": 4096
+  },
+  "os-ps1": "user@hallunix:~$",
+  "os-details": {
+    "OS": "HallUnix x86_64"
+  }
+}
