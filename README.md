@@ -52,7 +52,7 @@ Example of the content:
 }
 ```
 
-For supported LLM input parameters, refer to [LiteLLM Documentation](https://docs.litellm.ai/docs/completion/input).
+To see supported LLM input parameters, refer to [LiteLLM Documentation](https://docs.litellm.ai/docs/completion/input).
 
 #### `--quick`
 
